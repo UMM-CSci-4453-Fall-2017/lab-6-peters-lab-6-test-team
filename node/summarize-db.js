@@ -5,6 +5,11 @@ var mysql = require("mysql");
 credentials.host = "ids";
 var connection = mysql.createConnection(credentials);
 
+//num_tables keeps track of how many tables there are total
+//table_count keeps track of how many tables we've already looped through
+var num_tables = 0;
+var table_count = 0;
+
 connection.connect(function(err){
 	if(err){
 		console.log("Problems with MySQL: " + err);
@@ -13,88 +18,70 @@ connection.connect(function(err){
 	}
 });
 
-//var rows;
-
+//First query the mysql for a list of databases we have access to
 connection.query('SHOW DATABASES', function(err, results, fields){
 	if(err){
 		console.log("invalid query" + err);
 	} else {
-//		console.log(results);
+		//Iterate through each database
 		results.forEach(showTables);
 	}
 });
 
-
-iterateDatabases = function(row, index){
-
-
-	var row;
-	var database = row.Database;
-	console.log(database);
-
-	connection.query("USE " + database + ";", function(err, results, fields){
-
-		if (err){
-			console.log("issue switching databases " + err);
-		} else {
-		
-//			console.log(results);
-			(showTables);
-		}
-//	connection.query("SHOW TABLES;", function(err, results, fields){
-//		if(err){
-//			console.log("issue with tables query: " + err);
-//		} else {
-//			console.log("At line 38, database = " + database);
-//			console.log(results);
-//			console.log(fields);
-		//	results.forEach(describeTable, database);
-			
-//		}
-	
-//	})}
-	})
-}
-
+//Then query for a list of what tables that database contains
 showTables = function(database, index){
 	var db = database.Database;
 	connection.query("SHOW TABLES IN " + db + ";", function(err, results, fields){
 		if(err){
 			console.log("Issue showing tables " + err);
 		} else {
+			//Update how many tables there are for each database
+			num_tables = num_tables + results.length;
+			//iterate through the list of tables
 			results.forEach(describeTable, db);
 		}
-	})
-}
+	});
+};
 
+//describe each table
 describeTable = function(table, index){
-//console.log("Got to line 58 ");
-//console.log(fields);
-	//for(j = 0; j < tables.length; j++){
 	var name = "Tables_in_" + this;
-	var tableName = table[name];
-//	console.log(table);
-//	console.log("Database = " + this + " table = " + tableName);
-	//var db = fields[0].db;
-	//console.log("Line 65 database = " + db + " table = " + table);
-	
-	connection.query("DESCRIBE " + this + "." + tableName + ";", function(err, results, fields){
+	var tableName = this + "." + table[name];
+	var db = this.toString();
+	connection.query("DESCRIBE " + tableName + ";", function(err, results, fields){
 		if(err){
 			console.log("Issue describing table " + err);
 		} else {
-			console.log(tableName);
-			console.log(results);
+			//Only want to print the database name once
+			if(index == 0){
+				console.log(db);
+			}
+
+			console.log("......" + tableName);
+
+			//Loop through the list of columns, printing them out in an
+			//easily understandable format
+			for(i = 0; i < results.length; i++){
+				console.log("	FieldName: " + results[i].Field +
+					"    " + results[i].Type);
+			}
+
+			//add 1 to table_count to show that 1 more table has been processed
+			//If we're done, time to close the connection
+			table_count++;	
+			if(done()){
+				connection.end();
+				console.log("All done!");
+			}
 		}
-	})
+	});
+};
+
+//If we have iterated over as many tables as we have access to or more, returns true
+//Returns false otherwise.
+done = function(){
+	return num_tables <= table_count;
 }
-
-//connection.close();
-
-console.log("All done");
-
-
-
-
 
 
 
